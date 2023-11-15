@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <table style="border-collapse: collapse; border-spacing: 0; width: 100%;">
+        <caption><h2>Oferty indywidualne</h2></caption>
+        <thead style="border-bottom: solid 2px #e5e5e5">
+            <tr>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Zdjecie</th>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Tytuł</th>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Cena</th>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Data znalezienia</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in individual_offers %}
+                <tr>
+                    <td><img src="{{ item.image }}" style="max-width: 100px; max-height: 100px;"></td>
+                    <td><a href="{{ item.link }}">{{ item.name }}</a></td>
+                    <td>{{ item.price }}</td>
+                    <td>{{ item.date }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <table style="border-collapse: collapse; border-spacing: 0; width: 100%;" border="0">
+        <caption><h2>Oferty zduplikowane</h2></caption>
+        <thead style="border-bottom: solid 2px #e5e5e5">
+            <tr>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Zdjecie</th>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Tytuł</th>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Cena</th>
+                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Data znalezienia</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for items in duplicated_offers %}
+                <tr>
+                    <td><img src="{{ items[0].image }}" style="max-width: 100px; max-height: 100px;"></td>
+                    <td>
+                        <ul>
+                          {% for item in items %}
+                          <li><a href="{{ item.link }}">{{ item.name }}</a></li>
+                          {% endfor %}
+                        </ul>
+                    </td>
+                    <td>
+                        <ul>
+                          {% for item in items %}
+                          <li>{{ item.price }}</li>
+                          {% endfor %}
+                        </ul>
+                    </td>
+                    <td>
+                        <ul>
+                          {% for item in items %}
+                          <li>{{ item.date }}</li>
+                          {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+feedparser = "*"
+pillow = "*"
+yagmail = "*"
+imagehash = "*"
+jinja2 = "*"
+schedule = "*"
+pytz = "*"
+python-dateutil = "*"
+babel = "*"
+
+[dev-packages]
+matplotlib = "*"
+jupyter = "*"
+
+[requires]
+python_version = ">=3.10"
