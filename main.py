@@ -117,7 +117,7 @@ def pepper_entry_to_dict(entry: FeedParserDict):
     return dict(
         image=entry['media_content'][0]['url'],
         link=entry.link,
-        price=entry['pepper_merchant']['price'],
+        price=entry['pepper_merchant'].get('price', None),
         date=parse_date(entry.published),
         name=entry.title
     )
