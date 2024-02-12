@@ -2,7 +2,6 @@ import logging
 import re
 import time
 import urllib
-import warnings
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from urllib.error import HTTPError
@@ -12,25 +11,29 @@ import imagehash
 import requests
 import schedule
 import yagmail
+import yaml
 from PIL import Image
 from babel.dates import format_date
 from dateutil.parser import parse
 from feedparser import FeedParserDict
 from jinja2 import Template
 from pytz import timezone
-from urllib3.exceptions import InsecureRequestWarning
+
+LZX_RSS_URL = 'https://lzx.pl/rss?rssToken=0b663c1b-b50d-49c9-9883-3966b8448e53'
+PEPPER_RSS_URL = 'https://www.pepper.pl/rssx/keyword-alarm/IInN3LKHbImErz3vxXeU-U4WYt0YZ9jIYAJYUmpiiWU.'
+LASTMINUTER_RSS_URL = 'https://www.lastminuter.pl/feed'
+
+with open('secrets.yml', 'rt') as f:
+    secrets = yaml.safe_load(f)
+
+SRC_MAIL = secrets['src_mail']
+SRC_PWD = secrets['src_pwd']
+DST_MAIL = secrets['dst_mail']
 
 
 def parse_date(datetime_str: str) -> str:
     datetime_obj = parse(datetime_str)
     return format_date(datetime_obj, format='medium', locale='pl_PL')
-
-
-LZX_RSS_URL = r'https://lzx.pl/rss?rssToken=351d0061-60fb-40e2-ae44-a308c922e0f0'
-PEPPER_RSS_URL = 'https://www.pepper.pl/rssx/keyword-alarm/IInN3LKHbImErz3vxXeU-U4WYt0YZ9jIYAJYUmpiiWU.'
-SRC_MAIL = 'emailsender828@gmail.com'
-SRC_PWD = 'wjkhbqxzmznelbmr'
-DST_MAIL = 'emaileznewsletterow@gmail.com'
 
 
 def get_last_day_entries(rss_url: str) -> list[FeedParserDict]:
@@ -41,9 +44,18 @@ def get_last_day_entries(rss_url: str) -> list[FeedParserDict]:
     return [entry for entry in feed.entries if parse(entry.published) > time_24h_ago]
 
 
+def get_last_day_lastminuter_entries(rss_url: str) -> list[FeedParserDict]:
+    warsaw = timezone('Europe/Warsaw')
+    time_24h_ago = warsaw.localize(datetime.now() - timedelta(hours=24, minutes=10))
+
+    rss = requests.get(rss_url) #, verify=False)
+    feed = feedparser.parse(rss.text, modified=time_24h_ago.strftime('%a, %d %b %Y %H:%M:%S %Z'))
+    return [entry for entry in feed.entries if parse(entry.published) > time_24h_ago]
+
+
 def get_direct_link(item: FeedParserDict) -> FeedParserDict:
     url = item.link
-    response = requests.head(url, allow_redirects=True, verify=False)
+    response = requests.head(url, allow_redirects=True) #, verify=False)
     item['link'] = response.url
     return item
 
@@ -117,7 +129,17 @@ def pepper_entry_to_dict(entry: FeedParserDict):
     return dict(
         image=entry['media_content'][0]['url'],
         link=entry.link,
-        price=entry['pepper_merchant'].get('price', None),
+        price=entry.get('pepper_merchant', {}).get('price', None),
+        date=parse_date(entry.published),
+        name=entry.title
+    )
+
+
+def lastminuter_entry_to_dict(entry: FeedParserDict):
+    return dict(
+        image=None,
+        link=entry.link,
+        price=None,
         date=parse_date(entry.published),
         name=entry.title
     )
@@ -152,13 +174,17 @@ def send_mail(html_content: str) -> None:
 
 
 def main():
-    warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+    # warnings.filterwarnings("ignore", category=InsecureRequestWarning)
     lzx_entries = get_last_day_entries(LZX_RSS_URL)
     lzx_entries = assign_direct_offers_links(lzx_entries)
     lzx_entries = assign_images_lzx(lzx_entries)
     grouped_entries = group_entries(lzx_entries)
     unique_offers = get_unique_offers(grouped_entries)
     duplicated_offers = get_duplicated_offers(grouped_entries)
+
+    lastminuter_entries = get_last_day_lastminuter_entries(LASTMINUTER_RSS_URL)
+    lastminuter_entries = [lastminuter_entry_to_dict(entry) for entry in lastminuter_entries]
+    unique_offers.extend(lastminuter_entries)
 
     pepper_entries = get_last_day_entries(PEPPER_RSS_URL)
     pepper_entries = [pepper_entry_to_dict(entry) for entry in pepper_entries]
@@ -172,12 +198,11 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(filename='error.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-    try:
-        schedule.every().day.at("08:00").do(main)
-        while True:
+    schedule.every().day.at("09:05").do(main)
+    while True:
+        try:
             schedule.run_pending()
-            time.sleep(1)
-    except Exception as e:
-        logging.exception("An error occurred:")
-        raise
+        except Exception as e:
+            logging.exception("An error occurred:")
+        time.sleep(1)
     # main()
