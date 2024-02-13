@@ -21,7 +21,6 @@ from pytz import timezone
 
 LZX_RSS_URL = 'https://lzx.pl/rss?rssToken=0b663c1b-b50d-49c9-9883-3966b8448e53'
 PEPPER_RSS_URL = 'https://www.pepper.pl/rssx/keyword-alarm/IInN3LKHbImErz3vxXeU-U4WYt0YZ9jIYAJYUmpiiWU.'
-LASTMINUTER_RSS_URL = 'https://www.lastminuter.pl/feed'
 
 with open('secrets.yml', 'rt') as f:
     secrets = yaml.safe_load(f)
@@ -44,18 +43,9 @@ def get_last_day_entries(rss_url: str) -> list[FeedParserDict]:
     return [entry for entry in feed.entries if parse(entry.published) > time_24h_ago]
 
 
-def get_last_day_lastminuter_entries(rss_url: str) -> list[FeedParserDict]:
-    warsaw = timezone('Europe/Warsaw')
-    time_24h_ago = warsaw.localize(datetime.now() - timedelta(hours=24, minutes=10))
-
-    rss = requests.get(rss_url) #, verify=False)
-    feed = feedparser.parse(rss.text, modified=time_24h_ago.strftime('%a, %d %b %Y %H:%M:%S %Z'))
-    return [entry for entry in feed.entries if parse(entry.published) > time_24h_ago]
-
-
 def get_direct_link(item: FeedParserDict) -> FeedParserDict:
     url = item.link
-    response = requests.head(url, allow_redirects=True) #, verify=False)
+    response = requests.head(url, allow_redirects=True)  # , verify=False)
     item['link'] = response.url
     return item
 
@@ -135,16 +125,6 @@ def pepper_entry_to_dict(entry: FeedParserDict):
     )
 
 
-def lastminuter_entry_to_dict(entry: FeedParserDict):
-    return dict(
-        image=None,
-        link=entry.link,
-        price=None,
-        date=parse_date(entry.published),
-        name=entry.title
-    )
-
-
 def get_unique_offers(grouped_offers: list[list[FeedParserDict]]) -> list[dict]:
     unique_offers = [g[0] for g in grouped_offers if len(g) == 1]
     return [lzx_entry_to_dict(o) for o in unique_offers]
@@ -169,22 +149,17 @@ def generate_html_str(unique_offers: list[dict], duplicated_offers: list[list[di
 
 def send_mail(html_content: str) -> None:
     email_subject = 'Oferty LZX i Pepper'
-    yag = yagmail.SMTP(SRC_MAIL, SRC_PWD, port=587, smtp_starttls=True, smtp_ssl=False)
+    yag = yagmail.SMTP(SRC_MAIL, SRC_PWD, port=587, smtp_starttls=True)  # , smtp_ssl=False)
     yag.send(to=DST_MAIL, subject=email_subject, contents=(html_content, 'text/html'))
 
 
 def main():
-    # warnings.filterwarnings("ignore", category=InsecureRequestWarning)
     lzx_entries = get_last_day_entries(LZX_RSS_URL)
     lzx_entries = assign_direct_offers_links(lzx_entries)
     lzx_entries = assign_images_lzx(lzx_entries)
     grouped_entries = group_entries(lzx_entries)
     unique_offers = get_unique_offers(grouped_entries)
     duplicated_offers = get_duplicated_offers(grouped_entries)
-
-    lastminuter_entries = get_last_day_lastminuter_entries(LASTMINUTER_RSS_URL)
-    lastminuter_entries = [lastminuter_entry_to_dict(entry) for entry in lastminuter_entries]
-    unique_offers.extend(lastminuter_entries)
 
     pepper_entries = get_last_day_entries(PEPPER_RSS_URL)
     pepper_entries = [pepper_entry_to_dict(entry) for entry in pepper_entries]
@@ -198,7 +173,7 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(filename='error.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-    schedule.every().day.at("09:05").do(main)
+    schedule.every().day.at("11:05").do(main)
     while True:
         try:
             schedule.run_pending()

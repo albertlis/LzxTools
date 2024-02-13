@@ -13,10 +13,8 @@ schedule = "*"
 pytz = "*"
 python-dateutil = "*"
 babel = "*"
+easydict = "*"
 
 [dev-packages]
 matplotlib = "*"
 jupyter = "*"
-
-[requires]
-python_version = ">=3.10"
