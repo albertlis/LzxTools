@@ -4,16 +4,19 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+babel = "*"
+beautifulsoup4 = "*"
+easydict = "*"
 feedparser = "*"
-pillow = "*"
-yagmail = "*"
 imagehash = "*"
 jinja2 = "*"
-schedule = "*"
-pytz = "*"
+pillow = "*"
 python-dateutil = "*"
-babel = "*"
-easydict = "*"
+pytz = "*"
+schedule = "*"
+selenium = "*"
+webdriver-manager = "*"
+yagmail = "*"
 
 [dev-packages]
 matplotlib = "*"
