@@ -1,45 +1,17 @@
 import logging
-import re
+import os
 import time
-import urllib
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
-from urllib.error import HTTPError
 
-import feedparser
-import imagehash
-import requests
 import schedule
 import yagmail
-import yaml
-from PIL import Image
-from babel.dates import format_date
-from dateutil.parser import parse
-from easydict import EasyDict
-from feedparser import FeedParserDict
+from dotenv import load_dotenv
 from jinja2 import Template
-from pytz import timezone
-from collections import namedtuple
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support import expected_conditions as EC
+from otomoto_scrapper import OtomotoScrapper
+from pepper_scrapper import PepperScrapper
 
-URL = r'https://www.pepper.pl'
-CHROME_DRIVER_PATH = ChromeDriverManager().install()
-SKIP_COOKIES = (By.XPATH, "//button[.//span[contains(text(), 'Kontynuuj bez akceptacji')]]")
-HOTTEST_OFFERS = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
-HOTTEST_OFFERS_PAGES = (By.CSS_SELECTOR, "ol.lbox--v-2 > li > button")
-
-with open('secrets.yml', 'rt') as f:
-    secrets = yaml.safe_load(f)
-
+""" abc
 LZX_RSS_URL = secrets['lzx_rss_url']
-PEPPER_RSS_URL = secrets['pepper_rss_url']
-
 
 def parse_date(datetime_str: str) -> str:
     datetime_obj = parse(datetime_str)
@@ -126,26 +98,6 @@ def lzx_entry_to_dict(entry: FeedParserDict):
     )
 
 
-def pepper_entry_to_dict(entry: FeedParserDict):
-    return dict(
-        image=entry['media_content'][0]['url'],
-        link=entry.link,
-        price=entry.get('pepper_merchant', {}).get('price', None),
-        date=parse_date(entry.published),
-        name=entry.title
-    )
-
-
-def pepper_hottest_to_dict(offer: namedtuple) -> dict:
-    return dict(
-        image=offer.image,
-        link=offer.href,
-        price=None,
-        date=None,
-        name=offer.title
-    )
-
-
 def get_unique_offers(grouped_offers: list[list[FeedParserDict]]) -> list[dict]:
     unique_offers = [g[0] for g in grouped_offers if len(g) == 1]
     return [lzx_entry_to_dict(o) for o in unique_offers]
@@ -158,72 +110,26 @@ def get_duplicated_offers(grouped_offers: list[list[FeedParserDict]]) -> list[li
         return [lzx_entry_to_dict(o) for o in duplicates]
 
     return [to_list_of_dicts(duplicates) for duplicates in duplicated_offers]
+"""
 
 
-def generate_html_str(unique_offers: list[dict], duplicated_offers: list[list[dict]]) -> str:
+def generate_html_str(unique_offers: list[dict]) -> str:
     with open('template.html', 'rt', encoding='utf-8') as f:
         html_template = f.read()
     template = Template(html_template)
     return template.render(
-        individual_offers=unique_offers, duplicated_offers=duplicated_offers
+        individual_offers=unique_offers
     )
 
 
 def send_mail(html_content: str) -> None:
     email_subject = 'Oferty LZX i Pepper'
-    with open('secrets.yml', 'rt') as f:
-        secrets = EasyDict(yaml.safe_load(f))
-    yag = yagmail.SMTP(secrets.src_mail, secrets.src_pwd, port=587, smtp_starttls=True, smtp_ssl=False)
-    yag.send(to=secrets.dst_mail, subject=email_subject, contents=(html_content, 'text/html'))
-
-
-def get_driver() -> webdriver.Chrome:
-    op = webdriver.ChromeOptions()
-    op.add_argument("window-size=1600,1080")  # Specify resolution
-    op.add_argument('--headless')
-    op.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/2b7c7"
-    )
-    return webdriver.Chrome(service=Service(CHROME_DRIVER_PATH), options=op)
-
-
-def click_element(wait: WebDriverWait, element):
-    button = wait.until(EC.element_to_be_clickable(element))
-    button.click()
-
-
-def get_hottest_pepper_offers() -> set[namedtuple]:
-    driver = get_driver()
-    driver.get(URL)
-    wait = WebDriverWait(driver, 20)
-    click_element(wait, SKIP_COOKIES)
-
-    pagination_buttons = wait.until(EC.presence_of_all_elements_located(HOTTEST_OFFERS_PAGES))
-
-    all_hottest_offers = set()
-    Offer = namedtuple('Offer', ['title', 'href', 'image'])
-    for page_index in range(len(pagination_buttons)):
-        # Refresh the list of pagination buttons
-        pagination_buttons = wait.until(EC.presence_of_all_elements_located(HOTTEST_OFFERS_PAGES))
-        if page_index > 0:
-            pagination_buttons[page_index].click()
-
-        items = wait.until(EC.presence_of_all_elements_located(HOTTEST_OFFERS))
-        # Extract information from each item
-        for item in items:
-            link_element = item.find_element(By.TAG_NAME, "a")
-            href = link_element.get_attribute("href")
-            title = link_element.get_attribute("title")
-            image_element = item.find_element(By.TAG_NAME, "img")
-            image_src = image_element.get_attribute("src")
-
-            all_hottest_offers.add(Offer(title, href, image_src))
-
-    driver.close()
-    return all_hottest_offers
+    yag = yagmail.SMTP(os.getenv('SRC_MAIL'), os.getenv('SRC_PWD'), port=587, smtp_starttls=True, smtp_ssl=False)
+    yag.send(to=os.getenv('DST_MAIL'), subject=email_subject, contents=(html_content, 'text/html'))
 
 
 def main():
+    """
     lzx_entries = get_last_day_entries(LZX_RSS_URL)
     lzx_entries = assign_direct_offers_links(lzx_entries)
     lzx_entries = assign_images_lzx(lzx_entries)
@@ -238,19 +144,36 @@ def main():
     hottest = get_hottest_pepper_offers()
     hottest = [pepper_hottest_to_dict(offer) for offer in hottest]
     unique_offers.extend(hottest)
-    html_content = generate_html_str(unique_offers, duplicated_offers)
-    # with open('test.html', 'w', encoding='utf-8-sig') as f:
-    #     f.write(html_content)
+    """
+    load_dotenv()
+
+    otomoto_scrapper = OtomotoScrapper(os.getenv('OTOMOTO_URL'))
+    otomoto_offers = otomoto_scrapper.get_offers()
+
+    otomoto_scrapper.link = os.getenv('OTOMOTO_2_URL')
+    otomoto_offers.extend(otomoto_scrapper.get_offers())
+
+    otomoto_scrapper.link = os.getenv('OTOMOTO_MERIVA_URL')
+    otomoto_offers.extend(otomoto_scrapper.get_offers())
+
+    otomoto_offers = otomoto_scrapper.new_offers_to_dict(otomoto_offers)
+
+    pepper_scrapper = PepperScrapper()
+    pepper_offers = pepper_scrapper.get_hottest_pepper_offers()
+    # pepper_offers = []
+    html_content = generate_html_str([*pepper_offers, *otomoto_offers])
+    with open('test.html', 'w', encoding='utf-8-sig') as f:
+        f.write(html_content)
     send_mail(html_content)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='error.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s - %(filename)s - %(funcName)s - Line: %(lineno)d')
     schedule.every().day.at("11:05").do(main)
     while True:
         try:
             schedule.run_pending()
         except Exception as e:
             logging.exception("An error occurred:")
-        time.sleep(1)
+        time.sleep(10)
     # main()
