@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "LzxTools"
+version = "0.1.0"
+description = "App for getting offers from LZX, Otomot and Pepper and send it trough email"
+authors = ["Somebody ToLove <stl@protonmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+beautifulsoup4 = "*"
+jinja2 = "*"
+pillow = "*"
+python-dotenv = "*"
+schedule = "*"
+selenium = "*"
+yagmail = "*"
+zstandard = "*"
+
+[tool.poetry.dev-dependencies]
+matplotlib = "*"
+jupyter = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

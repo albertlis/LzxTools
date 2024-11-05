@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import time
 
 import schedule
@@ -145,6 +146,9 @@ def main():
     hottest = [pepper_hottest_to_dict(offer) for offer in hottest]
     unique_offers.extend(hottest)
     """
+    if platform.system() == "Linux":
+        os.nice(10)
+
     load_dotenv()
 
     otomoto_scrapper = OtomotoScrapper(os.getenv('OTOMOTO_URL'))
@@ -161,6 +165,7 @@ def main():
     pepper_scrapper = PepperScrapper()
     pepper_offers = pepper_scrapper.get_hottest_pepper_offers()
     # pepper_offers = []
+
     html_content = generate_html_str([*pepper_offers, *otomoto_offers])
     with open('test.html', 'w', encoding='utf-8-sig') as f:
         f.write(html_content)
@@ -168,12 +173,20 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s - %(filename)s - %(funcName)s - Line: %(lineno)d')
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s - Line: %(lineno)d - %(filename)s - %(funcName)s() - %(message)s',
+        level=logging.DEBUG
+    )
     schedule.every().day.at("11:05").do(main)
+    i = 0
     while True:
         try:
             schedule.run_pending()
+            time.sleep(10)
         except Exception as e:
             logging.exception("An error occurred:")
-        time.sleep(10)
+            i += 1
+            if i > 10:
+                logging.error('Exiting program due to too many errors')
+                break
     # main()

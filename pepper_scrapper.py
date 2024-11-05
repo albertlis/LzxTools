@@ -29,19 +29,35 @@ class PepperScrapper(ScrapperBase):
 
     @staticmethod
     def get_driver() -> webdriver.Chrome:
-        options = webdriver.ChromeOptions()
-        options.add_argument("window-size=1600,1080")  # Specify resolution
+        system = platform.system()
+        if system not in {"Windows", "Linux"}:
+            raise ValueError("This driver only works on Windows and Linux systems.")
+
+        browser = 'chrome' if system == "Linux" else 'edge'
+
+        options = webdriver.ChromeOptions() if browser == 'chrome' else webdriver.EdgeOptions()
+        options.add_argument("window-size=1400,1080")
         options.add_argument("--disk-cache-size=10485760")
         options.add_argument('--headless')
         options.add_argument('--disable-gpu')
         options.add_argument('--log-level=3')
         options.add_argument('--no-sandbox')
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins-discovery")
+
+        if browser == 'chrome':
+            options.binary_location = "/usr/bin/chromium-browser"
+        # Disable loading images for better performance
         prefs = {"profile.managed_default_content_settings.images": 2}
         options.add_experimental_option("prefs", prefs)
         options.add_argument(
-            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/2b7c7"
+            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/58.0.3029.110 Safari/2b7c7"
         )
-        return webdriver.Chrome(options=options)
+        if browser == "chrome":
+            return webdriver.Chrome(options, Service(executable_path="/usr/bin/chromedriver"))
+        else:
+            return webdriver.Chrome(options=options)
 
     @staticmethod
     def click_element(wait: WebDriverWait, element: tuple[str, str]):
