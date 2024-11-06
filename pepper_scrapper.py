@@ -1,9 +1,11 @@
 import logging
 import os
+import platform
 from dataclasses import dataclass
 from pathlib import Path
 
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -11,7 +13,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from scrapper_base import ScrapperBase
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PepperOffer:
     name: str
     link: str
@@ -25,7 +27,6 @@ class PepperScrapper(ScrapperBase):
         self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
         self.hottest_offers_pages_locator = (By.CSS_SELECTOR, "ol.lbox--v-2 > li > button")
         self.link = os.getenv('PEPPER_URL')
-        self.cache = self.load_cache()
 
     @staticmethod
     def get_driver() -> webdriver.Chrome:
@@ -72,7 +73,7 @@ class PepperScrapper(ScrapperBase):
         self.click_element(wait, self.skip_cookies_locator)
 
         pagination_buttons = wait.until(EC.presence_of_all_elements_located(self.hottest_offers_pages_locator))
-
+        logging.debug(f'Found {len(pagination_buttons)} hottest offers pages')
         all_hottest_offers = []
 
         for page_index in range(len(pagination_buttons)):
@@ -80,6 +81,7 @@ class PepperScrapper(ScrapperBase):
             pagination_buttons = wait.until(EC.presence_of_all_elements_located(self.hottest_offers_pages_locator))
             if page_index > 0:
                 pagination_buttons[page_index].click()
+                logging.debug(f'Clicked {page_index} page button')
 
             items = wait.until(EC.presence_of_all_elements_located(self.hottest_offers_locator))
             # Extract information from each item
@@ -91,8 +93,11 @@ class PepperScrapper(ScrapperBase):
                 image_src = image_element.get_attribute("src")
 
                 if (offer := PepperOffer(title, href, image_src)) not in self.cache:
+                    logging.info(f'Found new {offer=}')
                     self.cache.add(offer)
                     all_hottest_offers.append(offer)
+                # offer = PepperOffer(title, href, image_src)
+                # all_hottest_offers.append(offer)
         driver.close()
         return all_hottest_offers
 

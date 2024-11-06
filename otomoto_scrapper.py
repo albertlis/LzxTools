@@ -22,8 +22,6 @@ class OtomotoScrapper(ScrapperBase):
     def __init__(self, link: str):
         super().__init__(cache_path=Path('otomoto_cache.pkl.zstd'))
         self.link = link
-        self.cache_path = "otomoto_cache.pkl.zstd"
-        self.cache = self.load_cache()
 
     def get_offers(self) -> list[OtomotoOffer]:
         response = requests.get(self.link, headers=self.headers)
@@ -42,7 +40,6 @@ class OtomotoScrapper(ScrapperBase):
                     title_tag = article.find('h1')
                     link = title_tag.find('a')['href']
                     title = title_tag.get_text(strip=True)
-                    logging.debug(f"Title: {title}, Link: {link}")
 
                     parameters = article.find_all('dd', {'data-parameter': True})
                     params = {}
@@ -50,11 +47,9 @@ class OtomotoScrapper(ScrapperBase):
                         parameter_type = param['data-parameter']
                         parameter_value = param.get_text(strip=True)
                         params[parameter_type] = parameter_value
-                        logging.debug(f"{parameter_type.capitalize()}: {parameter_value}")
 
                     image_tag = article.find('img')
                     image_url = image_tag.get('src')
-                    logging.debug(f"Image URL: {image_url}")
 
                     price = ''
                     for div in article.find_all('div'):
@@ -69,10 +64,9 @@ class OtomotoScrapper(ScrapperBase):
                         logging.error('Otomoto price not found')
                     offer = OtomotoOffer(title, link, params['year'], params['mileage'], image_url, price)
                     if offer not in self.cache:
+                        logging.info(f'Found new {offer=}')
                         new_offers.append(offer)
                         self.cache.add(offer)
-                    logging.debug("-" * 40)  # separator between articles
-
             else:
                 logging.warning('No Otomoto offers found')
         else:

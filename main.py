@@ -171,12 +171,16 @@ def main():
         f.write(html_content)
     send_mail(html_content)
 
-
+# TODO: fix pepper since frontend changed
 if __name__ == '__main__':
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s - Line: %(lineno)d - %(filename)s - %(funcName)s() - %(message)s',
         level=logging.DEBUG
     )
+    logging.getLogger("selenium").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+    main()
     schedule.every().day.at("11:05").do(main)
     i = 0
     while True:

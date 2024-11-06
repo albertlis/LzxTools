@@ -1,3 +1,4 @@
+import logging
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -6,10 +7,14 @@ from zstandard import ZstdDecompressor, ZstdCompressor
 
 
 class ScrapperBase(ABC):
-    def __init__(self, cache_path: Path):
+    def __init__(self, cache_path: Path | None = None):
         super().__init__()
-        self.cache_path = cache_path
-        self.cache = self.load_cache()
+        if cache_path:
+            self.cache_path = cache_path
+            self.cache = self.load_cache()
+        else:
+            self.cache_path = None
+            self.cache = None
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
         }
@@ -20,12 +25,13 @@ class ScrapperBase(ABC):
         pass
 
     def load_cache(self):
-        path = Path(self.cache_path)
-        if path.exists():
-            with open(path, 'rb') as f:
+        if self.cache_path.exists():
+            logging.debug(f"Loading cached data: {self.cache_path.resolve()}")
+            with open(self.cache_path, 'rb') as f:
                 data = f.read()
             data = ZstdDecompressor().decompress(data)
             return pickle.loads(data)
+        logging.debug(f"No cache found in: {self.cache_path.resolve()}")
         return set()
 
     def save_cache(self):
@@ -33,6 +39,8 @@ class ScrapperBase(ABC):
         data = ZstdCompressor().compress(data)
         with open(self.cache_path, 'wb') as f:
             f.write(data)
+        logging.debug(f"Saving cache data: {self.cache_path.resolve()}")
 
     def __del__(self):
-        self.save_cache()
+        if self.cache_path:
+            self.save_cache()
