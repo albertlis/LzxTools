@@ -2,37 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Oferty LZX</title>
     <style>
         body {
             margin: 0;
             padding: 0;
+            font-family: Arial, sans-serif;
         }
-        tr {
+        .offer-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .offer-item {
             border-bottom: 1px solid #e5e5e5;
+            padding: 15px 0;
+            clear: both; /* Ensures items don't overlap */
+        }
+        .offer-image {
+            float: left;
+            max-width: 100px;
+            max-height: 100px;
+            margin-right: 15px;
+        }
+        .offer-details {
+            overflow: hidden; /* Ensures text stays within bounds */
+        }
+        .offer-title {
+            font-size: 1.2em;
+            color: #646464;
+            margin: 0;
+        }
+        .offer-title a {
+            color: #646464;
+            text-decoration: none;
+        }
+        .offer-title a:hover {
+            text-decoration: underline;
+        }
+        .offer-price {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
         }
     </style>
 </head>
 <body>
-<div>
-    <table style="border-collapse: collapse; border-spacing: 0; width: 100%;">
-        <caption><h2>Oferty indywidualne</h2></caption>
-        <thead style="border-bottom: solid 2px #e5e5e5">
-            <tr>
-                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Zdjecie</th>
-                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Tytuł</th>
-                <th style="color: #646464; font-size: 1.2em; font-weight: 300; padding: 0 0.75em 0.75em 0.75em; text-align: left">Cena</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in individual_offers %}
-                <tr>
-                    <td><img src="{{ item.image }}" style="max-width: 100px; max-height: 100px;"></td>
-                    <td><a href="{{ item.link }}">{{ item.name }}</a></td>
-                    <td>{{ item.price }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+    <div class="offer-container">
+        <h2 style="text-align: center; color: #333;">Oferty indywidualne</h2>
+        {% for item in individual_offers %}
+        <div class="offer-item" style="clear: both; border-bottom: 1px solid #e5e5e5; padding: 15px 0;">
+            <img src="{{ item.image }}" alt="Zdjęcie produktu" class="offer-image" style="float: left; max-width: 100px; max-height: 100px; margin-right: 15px;">
+            <div class="offer-details" style="overflow: hidden;">
+                <p class="offer-title" style="font-size: 1.2em; color: #646464; margin: 0;">
+                    <a href="{{ item.link }}" style="color: #646464; text-decoration: none;">{{ item.name }}</a>
+                </p>
+                <p class="offer-price" style="font-size: 1.1em; font-weight: bold; color: #333;">{{ item.price }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </body>
 </html>

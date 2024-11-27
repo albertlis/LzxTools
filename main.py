@@ -162,11 +162,11 @@ def main():
 
     otomoto_offers = otomoto_scrapper.new_offers_to_dict(otomoto_offers)
 
-    pepper_scrapper = PepperScrapper()
-    pepper_offers = pepper_scrapper.get_hottest_pepper_offers()
+    # pepper_scrapper = PepperScrapper()
+    # pepper_offers = pepper_scrapper.get_hottest_pepper_offers()
     # pepper_offers = []
 
-    html_content = generate_html_str([*pepper_offers, *otomoto_offers])
+    html_content = generate_html_str(otomoto_offers)
     with open('test.html', 'w', encoding='utf-8-sig') as f:
         f.write(html_content)
     send_mail(html_content)
@@ -180,9 +180,9 @@ if __name__ == '__main__':
     logging.getLogger("selenium").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-    main()
     schedule.every().day.at("11:05").do(main)
     i = 0
+    main()
     while True:
         try:
             schedule.run_pending()

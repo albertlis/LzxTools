@@ -38,6 +38,9 @@ class OtomotoScrapper(ScrapperBase):
                 )
                 for article in articles:
                     title_tag = article.find('h1')
+                    if title_tag is None:
+                        logging.error(f'No title for Otomoto Offer, {article=}')
+                        continue
                     link = title_tag.find('a')['href']
                     title = title_tag.get_text(strip=True)
 
@@ -49,7 +52,7 @@ class OtomotoScrapper(ScrapperBase):
                         params[parameter_type] = parameter_value
 
                     image_tag = article.find('img')
-                    image_url = image_tag.get('src')
+                    image_url = image_tag.get('src') if image_tag else None
 
                     price = ''
                     for div in article.find_all('div'):

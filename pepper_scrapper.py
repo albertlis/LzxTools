@@ -25,6 +25,9 @@ class PepperScrapper(ScrapperBase):
         super().__init__(cache_path=Path('pepper_cache.pkl.zstd'))
         self.skip_cookies_locator = (By.XPATH, "//button[.//span[contains(text(), 'Kontynuuj bez akceptacji')]]")
         self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
+        self.today_button_locator = (By.XPATH, "//span[text()='Dzisiaj']/ancestor::button")
+        self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
+        self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
         self.hottest_offers_pages_locator = (By.CSS_SELECTOR, "ol.lbox--v-2 > li > button")
         self.link = os.getenv('PEPPER_URL')
 
