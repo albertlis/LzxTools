@@ -37,11 +37,9 @@ class OtomotoScrapper(ScrapperBase):
                     'article', {'data-media-size': 'small', 'data-orientation': 'horizontal'}
                 )
                 for article in articles:
-                    title_tag = article.find('h1')
-                    if title_tag is None:
-                        logging.error(f'No title for Otomoto Offer, {article=}')
-                        continue
-                    link = title_tag.find('a')['href']
+                    # title_tag = article.find('h1')
+                    title_tag = article.find('p').find('a', href=True)
+                    link = title_tag['href']
                     title = title_tag.get_text(strip=True)
 
                     parameters = article.find_all('dd', {'data-parameter': True})
