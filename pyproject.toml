@@ -1,26 +1,33 @@
-[tool.poetry]
-name = "LzxTools"
+[project]
+name = "lzxtools"
 version = "0.1.0"
 description = "App for getting offers from LZX, Otomot and Pepper and send it trough email"
-authors = ["Somebody ToLove <stl@protonmail.com>"]
-license = "MIT"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Somebody ToLove", email = "stl@protonmail.com" }]
+requires-python = ">=3.11"
+dependencies = [
+  "babel",
+  "beautifulsoup4",
+  "feedparser",
+  "imagehash",
+  "jinja2",
+  "pillow",
+  "playwright",
+  "python-dateutil",
+  "python-dotenv",
+  "pytz",
+  "schedule",
+  "yagmail",
+  "zstandard",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-beautifulsoup4 = "*"
-jinja2 = "*"
-pillow = "*"
-python-dotenv = "*"
-schedule = "*"
-selenium = "*"
-yagmail = "*"
-zstandard = "*"
-
-[tool.poetry.dev-dependencies]
-matplotlib = "*"
-jupyter = "*"
+[project.optional-dependencies]
+dev = ["matplotlib", "jupyter"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lzxtools"]

@@ -2,116 +2,17 @@ import logging
 import os
 import platform
 import time
+import argparse
+from typing import Callable, Iterable
 
 import schedule
 import yagmail
 from dotenv import load_dotenv
 from jinja2 import Template
 
+from lzx_parser import LzxScrapper
 from otomoto_scrapper import OtomotoScrapper
 from pepper_scrapper import PepperScrapper
-
-""" abc
-LZX_RSS_URL = secrets['lzx_rss_url']
-
-def parse_date(datetime_str: str) -> str:
-    datetime_obj = parse(datetime_str)
-    return format_date(datetime_obj, format='medium', locale='pl_PL')
-
-
-def get_last_day_entries(rss_url: str) -> list[FeedParserDict]:
-    warsaw = timezone('Europe/Warsaw')
-    time_24h_ago = warsaw.localize(datetime.now() - timedelta(hours=24, minutes=10))
-
-    feed = feedparser.parse(rss_url, modified=time_24h_ago.strftime('%a, %d %b %Y %H:%M:%S %Z'))
-    return [entry for entry in feed.entries if parse(entry.published) > time_24h_ago]
-
-
-def get_direct_link(item: FeedParserDict) -> FeedParserDict:
-    url = item.link
-    response = requests.head(url, allow_redirects=True)  # , verify=False)
-    item['link'] = response.url
-    return item
-
-
-def assign_direct_offers_links(entries: list[FeedParserDict]) -> list[FeedParserDict]:
-    with ThreadPoolExecutor() as executor:
-        return list(executor.map(get_direct_link, entries))
-
-
-def assign_images_lzx(entries: list[FeedParserDict]) -> list[FeedParserDict]:
-    for entry in entries:
-        try:
-            if entry.href.lower().endswith('nophoto.png'):
-                entry.image = None
-                continue
-            req = urllib.request.Request(entry.href, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req) as url:
-                entry.image = Image.open(url)
-        except HTTPError:
-            print(entry.href)
-            entry.image = None
-    return entries
-
-
-def remove_special_characters(input_string: str) -> str:
-    return re.sub(r'[^a-zA-Z0-9]', '', input_string).lower()
-
-
-def group_entries(entries: list[FeedParserDict]) -> list[list[FeedParserDict]]:
-    entries_c = entries.copy()
-    grouped_offers = []
-    # is_same_price = entry.summary == entry_2.summary
-    # TODO: set option
-    is_same_price = True
-    while entries_c:
-        entry = entries_c.pop()
-        group = [entry]
-        h_1 = None if entry.image is None else imagehash.average_hash(entry.image, 16)
-        t1 = remove_special_characters(entry.title)
-        idx_to_remove = set()
-        for i, entry_2 in enumerate(entries_c):
-            t2 = remove_special_characters(entry_2.title)
-            is_same_title = t1 == t2
-            if entry.image is None or entry_2.image is None:
-                is_same = is_same_title and is_same_price
-                if is_same:
-                    group.append(entry_2)
-                    idx_to_remove.add(i)
-                continue
-            h_2 = imagehash.average_hash(entry_2.image, 16)
-            similarity_score = (h_1 - h_2) / h_1.hash.size
-            if similarity_score < 0.1 or (is_same_title and is_same_price):
-                group.append(entry_2)
-                idx_to_remove.add(i)
-        grouped_offers.append(group)
-        entries_c = [entries_c[i] for i, _ in enumerate(entries_c) if i not in idx_to_remove]
-    return grouped_offers
-
-
-def lzx_entry_to_dict(entry: FeedParserDict):
-    return dict(
-        image=entry.href,
-        link=entry.link,
-        price=entry.summary,
-        date=parse_date(entry.published),
-        name=entry.title
-    )
-
-
-def get_unique_offers(grouped_offers: list[list[FeedParserDict]]) -> list[dict]:
-    unique_offers = [g[0] for g in grouped_offers if len(g) == 1]
-    return [lzx_entry_to_dict(o) for o in unique_offers]
-
-
-def get_duplicated_offers(grouped_offers: list[list[FeedParserDict]]) -> list[list[dict]]:
-    duplicated_offers = [g for g in grouped_offers if len(g) > 1]
-
-    def to_list_of_dicts(duplicates: list) -> list:
-        return [lzx_entry_to_dict(o) for o in duplicates]
-
-    return [to_list_of_dicts(duplicates) for duplicates in duplicated_offers]
-"""
 
 
 def generate_html_str(unique_offers: list[dict]) -> str:
@@ -129,68 +30,159 @@ def send_mail(html_content: str) -> None:
     yag.send(to=os.getenv('DST_MAIL'), subject=email_subject, contents=(html_content, 'text/html'))
 
 
-def main():
-    """
-    lzx_entries = get_last_day_entries(LZX_RSS_URL)
-    lzx_entries = assign_direct_offers_links(lzx_entries)
-    lzx_entries = assign_images_lzx(lzx_entries)
-    grouped_entries = group_entries(lzx_entries)
-    unique_offers = get_unique_offers(grouped_entries)
-    duplicated_offers = get_duplicated_offers(grouped_entries)
+# -------- New helpers (senior-style refactor) --------
 
-    pepper_entries = get_last_day_entries(PEPPER_RSS_URL)
-    pepper_entries = [pepper_entry_to_dict(entry) for entry in pepper_entries]
-    unique_offers.extend(pepper_entries)
-
-    hottest = get_hottest_pepper_offers()
-    hottest = [pepper_hottest_to_dict(offer) for offer in hottest]
-    unique_offers.extend(hottest)
-    """
+def _nice_if_linux() -> None:
     if platform.system() == "Linux":
-        os.nice(10)
+        try:
+            os.nice(10)
+        except Exception:
+            logging.debug("Could not adjust niceness", exc_info=True)
 
+
+def _load_env() -> None:
     load_dotenv()
+    # Only LZX URL is strictly needed when scraping lzx
+    # (Do not raise if not selected later)
+    # Extend validation easily here if required.
 
-    otomoto_scrapper = OtomotoScrapper(os.getenv('OTOMOTO_URL'))
-    otomoto_offers = otomoto_scrapper.get_offers()
 
-    otomoto_scrapper.link = os.getenv('OTOMOTO_2_URL')
-    otomoto_offers.extend(otomoto_scrapper.get_offers())
+def _scrape_lzx() -> list[dict]:
+    url = os.getenv('LZX_RSS_URL')
+    if not url:
+        logging.warning("LZX selected but LZX_RSS_URL not set; skipping.")
+        return []
+    try:
+        scr = LzxScrapper(url)
+        entries = scr.get_offers()
+        return entries if isinstance(entries, list) else []
+    except Exception:
+        logging.exception("LZX scraping failed")
+        return []
 
-    otomoto_scrapper.link = os.getenv('OTOMOTO_MERIVA_URL')
-    otomoto_offers.extend(otomoto_scrapper.get_offers())
 
-    otomoto_offers = otomoto_scrapper.new_offers_to_dict(otomoto_offers)
+def _scrape_pepper() -> list[dict]:
+    try:
+        scr = PepperScrapper()
+        offers = scr.get_hottest_pepper_offers()
+        return scr.new_offers_to_dict(offers)
+    except Exception:
+        logging.exception("Pepper scraping failed")
+        return []
 
-    # pepper_scrapper = PepperScrapper()
-    # pepper_offers = pepper_scrapper.get_hottest_pepper_offers()
-    # pepper_offers = []
 
-    html_content = generate_html_str(otomoto_offers)
+def _scrape_otomoto() -> list[dict]:
+    try:
+        scr = OtomotoScrapper()
+        offers = scr.get_offers()
+        return offers if isinstance(offers, list) else []
+    except Exception:
+        logging.exception("Otomoto scraping failed")
+        return []
+
+
+SCRAPER_REGISTRY: dict[str, Callable[[], list[dict]]] = {
+    "pepper": _scrape_pepper,
+    "lzx": _scrape_lzx,
+    "otomoto": _scrape_otomoto,
+}
+
+
+def _parse_sources(raw: str | None) -> list[str]:
+    if not raw:
+        return ["pepper"]  # previous implicit behavior
+    wanted = {s.strip().lower() for s in raw.split(",") if s.strip()}
+    if invalid := [w for w in wanted if w not in SCRAPER_REGISTRY]:
+        logging.warning("Ignoring unknown sources: %s", ", ".join(invalid))
+    selected = [s for s in ("pepper", "lzx", "otomoto") if s in wanted]
+    if not selected:
+        logging.warning("No valid sources selected; defaulting to pepper.")
+        return ["pepper"]
+    return selected
+
+
+def _aggregate_offers(sources: Iterable[str]) -> list[dict]:
+    aggregated: list[dict] = []
+    for src in sources:
+        logging.info("Scraping: %s", src)
+        offers = SCRAPER_REGISTRY[src]()
+        logging.info("Fetched %d offers from %s", len(offers), src)
+        aggregated.extend(offers)
+    # De-duplicate by a common key if available
+    seen = set()
+    unique: list[dict] = []
+    for o in aggregated:
+        if key := o.get("id") or o.get("url") or o.get("link"):
+            if key in seen:
+                continue
+            seen.add(key)
+        unique.append(o)
+    logging.info("Total unique offers: %d", len(unique))
+    return unique
+
+
+def run_once(selected_sources: list[str], *, send_email: bool) -> None:
+    _nice_if_linux()
+    _load_env()
+    offers = _aggregate_offers(selected_sources)
+    html_content = generate_html_str(offers)
     with open('test.html', 'w', encoding='utf-8-sig') as f:
         f.write(html_content)
-    send_mail(html_content)
+    logging.info("Wrote test.html")
+    if send_email:
+        try:
+            send_mail(html_content)
+            logging.info("Email sent.")
+        except Exception:
+            logging.exception("Failed to send email")
 
-# TODO: fix pepper since frontend changed
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="Scrape selected sources and produce HTML/email.")
+    p.add_argument("--sources", help="Comma separated: pepper,lzx,otomoto (default: pepper)")
+    p.add_argument("--email", action="store_true", help="Send email with results")
+    p.add_argument("--schedule", metavar="HH:MM", help="If set, run daily at given 24h time")
+    p.add_argument("--once", action="store_true", help="Run once immediately (default if no --schedule)")
+    return p
+
+
+def main() -> None:
+    parser = _build_arg_parser()
+    args = parser.parse_args()
+
+    selected = _parse_sources(args.sources)
+
+    if args.schedule:
+        # Schedule daily run
+        schedule.clear()
+        schedule.every().day.at(args.schedule).do(run_once, selected_sources=selected, send_email=args.email)
+        logging.info("Scheduled daily run at %s for sources: %s", args.schedule, ",".join(selected))
+        # Also run immediately unless suppressed
+        if not args.once:
+            run_once(selected, send_email=args.email)
+        errors = 0
+        while True:
+            try:
+                schedule.run_pending()
+                time.sleep(10)
+            except KeyboardInterrupt:
+                logging.info("Interrupted by user.")
+                break
+            except Exception:
+                logging.exception("Loop error")
+                errors += 1
+                if errors > 10:
+                    logging.error("Too many errors; exiting.")
+                    break
+    else:
+        run_once(selected, send_email=args.email)
+
+
 if __name__ == '__main__':
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s - Line: %(lineno)d - %(filename)s - %(funcName)s() - %(message)s',
-        level=logging.DEBUG
+        level=logging.INFO
     )
     logging.getLogger("selenium").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-    schedule.every().day.at("11:05").do(main)
-    i = 0
     main()
-    while True:
-        try:
-            schedule.run_pending()
-            time.sleep(10)
-        except Exception as e:
-            logging.exception("An error occurred:")
-            i += 1
-            if i > 10:
-                logging.error('Exiting program due to too many errors')
-                break
-    # main()

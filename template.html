@@ -1,66 +1,146 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="UTF-8">
     <title>Oferty LZX</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
+        /* Progressive enhancement (Gmail ignores most classes, still OK) */
+        @media only screen and (max-width: 600px) {
+            .wrap {
+                width: 100% !important;
+            }
+
+            .stack {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            .img-col {
+                padding-bottom: 14px !important;
+                text-align: center !important;
+            }
+
+            .img-col img {
+                margin: 0 auto !important;
+            }
+
+            .title {
+                font-size: 18px !important;
+                line-height: 22px !important;
+            }
         }
-        .offer-container {
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
+
+        a[x-apple-data-detectors] {
+            color: inherit !important;
+            text-decoration: none !important;
         }
-        .offer-item {
-            border-bottom: 1px solid #e5e5e5;
-            padding: 15px 0;
-            clear: both; /* Ensures items don't overlap */
+
+        u + #body a {
+            color: #2a72e5 !important;
+            text-decoration: none !important;
         }
-        .offer-image {
-            float: left;
-            max-width: 100px;
-            max-height: 100px;
-            margin-right: 15px;
-        }
-        .offer-details {
-            overflow: hidden; /* Ensures text stays within bounds */
-        }
-        .offer-title {
-            font-size: 1.2em;
-            color: #646464;
-            margin: 0;
-        }
-        .offer-title a {
-            color: #646464;
-            text-decoration: none;
-        }
-        .offer-title a:hover {
-            text-decoration: underline;
-        }
-        .offer-price {
-            font-size: 1.1em;
-            font-weight: bold;
-            color: #333;
+
+        .darkmode-bg {
+            background: #ffffff;
         }
     </style>
 </head>
-<body>
-    <div class="offer-container">
-        <h2 style="text-align: center; color: #333;">Oferty indywidualne</h2>
-        {% for item in individual_offers %}
-        <div class="offer-item" style="clear: both; border-bottom: 1px solid #e5e5e5; padding: 15px 0;">
-            <img src="{{ item.image }}" alt="Zdjęcie produktu" class="offer-image" style="float: left; max-width: 100px; max-height: 100px; margin-right: 15px;">
-            <div class="offer-details" style="overflow: hidden;">
-                <p class="offer-title" style="font-size: 1.2em; color: #646464; margin: 0;">
-                    <a href="{{ item.link }}" style="color: #646464; text-decoration: none;">{{ item.name }}</a>
-                </p>
-                <p class="offer-price" style="font-size: 1.1em; font-weight: bold; color: #333;">{{ item.price }}</p>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
+<body id="body" style="margin:0; padding:0; background:#f5f7fa; -webkit-font-smoothing:antialiased;">
+<!-- Preheader (hidden) -->
+<div style="display:none; font-size:0; line-height:0; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all;">
+    Najnowsze oferty dopasowane do Ciebie.
+</div>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+       style="background:#f5f7fa; margin:0; padding:24px 0;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" class="wrap darkmode-bg"
+                   style="width:600px; max-width:600px; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.06); font-family:Arial,Helvetica,sans-serif;">
+                <!-- Header -->
+                <tr>
+                    <td style="padding:32px 32px 20px; text-align:center; background:linear-gradient(135deg,#2a72e5,#4ab3ff);">
+                        <h1 style="margin:0; font-size:26px; line-height:30px; color:#ffffff; font-weight:600; letter-spacing:.5px;">
+                            Oferty indywidualne</h1>
+                        <p style="margin:10px 0 0; font-size:14px; line-height:18px; color:#e8f3ff;">Specjalnie
+                            wyselekcjonowane dla Ciebie</p>
+                    </td>
+                </tr>
+
+                <!-- Intro -->
+                <tr>
+                    <td style="padding:20px 32px 10px; font-size:14px; line-height:20px; color:#4a5568;">
+                        {% if individual_offers and individual_offers|length > 0 %}
+                        Oto aktualne pozycje, które mogą Cię zainteresować:
+                        {% else %}
+                        W tym momencie brak nowych ofert. Wróć wkrótce – pracujemy nad kolejnymi propozycjami!
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {% if individual_offers and individual_offers|length > 0 %}
+                <!-- Offer list wrapper -->
+                <tr>
+                    <td style="padding:4px 20px 8px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            {% for item in individual_offers %}
+                            <!-- Single offer -->
+                            <tr>
+                                <td style="padding:14px 12px; border-bottom:1px solid #eef2f6;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <!-- Image column -->
+                                            <td valign="top" class="img-col" style="width:110px; padding:0 16px 0 0;">
+                                                {% if item.image %}
+                                                <a href="{{ item.link }}" style="text-decoration:none;">
+                                                    <img src="{{ item.image }}" alt="{{ item.name|default('Oferta') }}"
+                                                         width="110"
+                                                         style="display:block; width:110px; max-width:110px; height:auto; border-radius:8px; border:1px solid #e2e8f0; background:#fafbfc; object-fit:cover;">
+                                                </a>
+                                                {% else %}
+                                                <div style="width:110px; height:74px; border:1px solid #e2e8f0; border-radius:8px; background:#f1f5f9; font-size:11px; color:#64748b; display:flex; align-items:center; justify-content:center; font-family:Arial,Helvetica,sans-serif;">
+                                                    Brak zdjęcia
+                                                </div>
+                                                {% endif %}
+                                            </td>
+                                            <!-- Details -->
+                                            <td valign="top" style="padding:0; font-family:Arial,Helvetica,sans-serif;">
+                                                <div class="title"
+                                                     style="font-size:17px; line-height:22px; font-weight:600; color:#2d3748; margin:0 0 6px;">
+                                                    <a href="{{ item.link }}"
+                                                       style="color:#2a72e5; text-decoration:none;">{{ item.name }}</a>
+                                                </div>
+                                                <div style="font-size:13px; line-height:18px; color:#4a5568; margin:0 0 10px;">
+                                                    {% if item.description %}{{ item.description }}{% endif %}
+                                                </div>
+                                                <div style="font-size:16px; line-height:20px; font-weight:700; color:#1a202c;">
+                                                    {{ item.price }}
+                                                </div>
+                                                <!-- Optional CTA -->
+                                                <div style="margin-top:10px;">
+                                                    <a href="{{ item.link }}"
+                                                       style="display:inline-block; background:#2a72e5; color:#ffffff; font-size:12px; line-height:14px; padding:8px 14px; border-radius:20px; text-decoration:none; font-weight:600; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                                                        Zobacz szczegóły →
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Fallback text for very old clients -->
+<div style="display:none; white-space:nowrap; font:15px monospace; line-height:0;">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
 </body>
 </html>

@@ -3,106 +3,214 @@ import os
 import platform
 from dataclasses import dataclass
 from pathlib import Path
+import contextlib
+from contextlib import contextmanager  # added
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
+from playwright.sync_api import sync_playwright, Page, BrowserContext, Route, Request
 
 from scrapper_base import ScrapperBase
 
 
 @dataclass(frozen=True, slots=True)
 class PepperOffer:
+    """
+    Immutable representation of a Pepper offer.
+
+    Fields:
+        name: Human readable title (optionally enriched with price).
+        link: Direct URL to the offer.
+        image: Image URL (may be None if filtered or missing).
+    """
     name: str
     link: str
-    image: str
+    image: str | None
 
 
 class PepperScrapper(ScrapperBase):
-    def __init__(self):
+    """
+    Scraper for Pepper offers using Playwright (synchronous API).
+
+    Responsibilities:
+        - Navigate to Pepper najgoretsze page.
+        - Accept (or bypass) cookie dialog.
+        - Extract offer title, link, image and price.
+        - Maintain a de-duplicated cache via ScrapperBase.
+
+    Notes:
+        - Images are blocked at network layer for performance.
+        - Returns only offers not yet present in cache.
+    """
+
+    # New small configuration constants
+    _PAGE_PATHS: tuple[str, ...] = ("", "?page=2")
+    _NAV_TIMEOUT_MS = 25_000
+    _POST_NAV_SLEEP_MS = 500
+
+    def __init__(self) -> None:
         super().__init__(cache_path=Path('pepper_cache.pkl.zstd'))
-        self.skip_cookies_locator = (By.XPATH, "//button[.//span[contains(text(), 'Kontynuuj bez akceptacji')]]")
-        self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
-        self.today_button_locator = (By.XPATH, "//span[text()='Dzisiaj']/ancestor::button")
-        self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
-        self.hottest_offers_locator = (By.CLASS_NAME, "scrollBox-item.card-item.width--all-12")
-        self.hottest_offers_pages_locator = (By.CSS_SELECTOR, "ol.lbox--v-2 > li > button")
-        self.link = os.getenv('PEPPER_URL')
+        self.link: str = os.getenv('PEPPER_URL', 'https://www.pepper.pl/najgoretsze')
+        # Updated CSS selectors for current website structure
+        self._offer_container_selector = "article.thread"
+        self._title_selector = "strong.thread-title a.thread-link"
+        self._price_selector = "span.thread-price"
+        self._image_selector = "img.thread-image"
+        self._skip_cookies_xpath = "//button[.//span[contains(text(), 'Kontynuuj bez akceptacji')]]"
 
-    @staticmethod
-    def get_driver() -> webdriver.Chrome:
-        system = platform.system()
-        if system not in {"Windows", "Linux"}:
-            raise ValueError("This driver only works on Windows and Linux systems.")
+    def _block_unwanted(self, route: Route, request: Request) -> None:
+        """
+        Network routing callback to abort loading of images and media for performance.
+        """
+        if request.resource_type in {"image", "media", "font"}:
+            return route.abort()
+        return route.continue_()
 
-        browser = 'chrome' if system == "Linux" else 'edge'
+    @contextmanager
+    def _browser_session(self):
+        """
+        Managed Playwright session yielding a ready page with routing configured.
+        Guarantees full teardown even on exceptions.
+        """
+        playwright = browser = context = page = None
+        try:
+            system = platform.system()
+            channel = "msedge" if system == "Windows" else "chromium"
+            playwright = sync_playwright().start()
+            browser = playwright.chromium.launch(
+                channel=channel if channel != "chromium" else None,
+                headless=True,
+                args=[
+                    "--disable-gpu",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    "--disable-default-apps",
+                    "--disable-sync",
+                    "--disable-translate",
+                ],
+            )
+            context = browser.new_context(
+                user_agent=self.headers['User-Agent'],
+                viewport={"width": 1400, "height": 1080},
+                java_script_enabled=True,
+            )
+            context.route("**/*", self._block_unwanted)
+            page = context.new_page()
+            yield page
+        finally:
+            with contextlib.suppress(Exception):
+                if page:
+                    page.close()
+                if context:
+                    context.close()
+                if browser:
+                    browser.close()
+                if playwright:
+                    playwright.stop()
 
-        options = webdriver.ChromeOptions() if browser == 'chrome' else webdriver.EdgeOptions()
-        options.add_argument("window-size=1400,1080")
-        options.add_argument("--disk-cache-size=10485760")
-        options.add_argument('--headless')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--log-level=3')
-        options.add_argument('--no-sandbox')
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-plugins-discovery")
+    def _dismiss_cookie_banner(self, page: Page) -> None:
+        """
+        Attempt to dismiss the cookie dialog; silent on failure.
+        """
+        try:
+            locator = page.locator(f"xpath={self._skip_cookies_xpath}").first
+            locator.wait_for(timeout=4_000)
+            locator.click()
+            logging.debug("Dismissed cookie dialog.")
+        except Exception:
+            logging.debug("Cookie dialog not found or already dismissed.")
 
-        if browser == 'chrome':
-            options.binary_location = "/usr/bin/chromium-browser"
-        # Disable loading images for better performance
-        prefs = {"profile.managed_default_content_settings.images": 2}
-        options.add_experimental_option("prefs", prefs)
-        options.add_argument(
-            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/58.0.3029.110 Safari/2b7c7"
-        )
-        if browser == "chrome":
-            return webdriver.Chrome(options, Service(executable_path="/usr/bin/chromedriver"))
-        else:
-            return webdriver.Chrome(options=options)
-
-    @staticmethod
-    def click_element(wait: WebDriverWait, element: tuple[str, str]):
-        button = wait.until(EC.element_to_be_clickable(element))
-        button.click()
-        logging.debug(f'Clicked {element=}')
+    def _extract_offers_from_current_page(self, page) -> list[PepperOffer]:
+        """Parse currently loaded page and return PepperOffer objects (without cache filtering)."""
+        offers: list[PepperOffer] = []
+        offer_elements = page.locator(self._offer_container_selector)
+        count = offer_elements.count()
+        logging.debug(f"Detected {count} offer containers.")
+        for idx in range(count):
+            container = offer_elements.nth(idx)
+            try:
+                title_el = container.locator(self._title_selector)
+                if not title_el.count():
+                    continue
+                title_text = title_el.inner_text().strip()
+                link = title_el.get_attribute("href") or ""
+                if link and not link.startswith('http'):
+                    link = f"https://www.pepper.pl{link}"
+                price_el = container.locator(self._price_selector)
+                price_text = price_el.inner_text().strip() if price_el.count() else ""
+                image_el = container.locator(self._image_selector)
+                image_src = image_el.get_attribute("src") if image_el.count() else None
+                full_name = f"{title_text}, {price_text}" if price_text else title_text
+                offers.append(PepperOffer(full_name, link, image_src))
+            except Exception as exc:
+                logging.debug(f"Failed parsing offer index {idx}: {exc}")
+        return offers
 
     def get_hottest_pepper_offers(self) -> list[PepperOffer]:
-        driver = self.get_driver()
-        driver.get(self.link)
-        wait = WebDriverWait(driver, 20)
-        self.click_element(wait, self.skip_cookies_locator)
+        """
+        Scrape Pepper 'Najgorętsze' (first two pages) and return newly discovered offers (not in cache).
+        Refactored for clarity and safer resource handling.
+        """
+        base = self.link.split('?')[0]
+        target_pages = [f"{base}{suffix}" for suffix in self._PAGE_PATHS]
+        logging.debug(f"Pages to scrape: {target_pages}")
 
-        pagination_buttons = wait.until(EC.presence_of_all_elements_located(self.hottest_offers_pages_locator))
-        logging.debug(f'Found {len(pagination_buttons)} hottest offers pages')
-        all_hottest_offers = []
+        aggregated: dict[str, PepperOffer] = {}
 
-        for page_index in range(len(pagination_buttons)):
-            # Refresh the list of pagination buttons
-            pagination_buttons = wait.until(EC.presence_of_all_elements_located(self.hottest_offers_pages_locator))
-            if page_index > 0:
-                pagination_buttons[page_index].click()
-                logging.debug(f'Clicked {page_index} page button')
+        with self._browser_session() as page:
+            for idx, url in enumerate(target_pages):
+                logging.debug(f"Navigating to {url}")
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=self._NAV_TIMEOUT_MS)
+                except Exception as exc:
+                    logging.warning(f"Navigation failed ({url}): {exc}")
+                    continue
 
-            items = wait.until(EC.presence_of_all_elements_located(self.hottest_offers_locator))
-            # Extract information from each item
-            for item in items:
-                link_element = item.find_element(By.TAG_NAME, "a")
-                href = link_element.get_attribute("href")
-                title = link_element.get_attribute("title")
-                image_element = item.find_element(By.TAG_NAME, "img")
-                image_src = image_element.get_attribute("src")
+                if idx == 0:
+                    self._dismiss_cookie_banner(page)
 
-                if (offer := PepperOffer(title, href, image_src)) not in self.cache:
-                    logging.info(f'Found new {offer=}')
-                    self.cache.add(offer)
-                    all_hottest_offers.append(offer)
-                # offer = PepperOffer(title, href, image_src)
-                # all_hottest_offers.append(offer)
-        driver.close()
-        return all_hottest_offers
+                # Small pause to let dynamic content settle
+                page.wait_for_timeout(self._POST_NAV_SLEEP_MS)
+                with contextlib.suppress(Exception):
+                    page.wait_for_selector(self._offer_container_selector, timeout=10_000)
 
-    def new_offers_to_dict(self, new_offers: list[PepperOffer]) -> list[dict[str, str]]:
-        return [offer.__dict__ for offer in new_offers]
+                for offer in self._extract_offers_from_current_page(page):
+                    # Deduplicate across pages by link
+                    if offer.link and offer.link not in aggregated:
+                        aggregated[offer.link] = offer
+
+        if not aggregated:
+            logging.debug("No offers extracted.")
+            return []
+
+        # Cache filtering (use set for O(1) membership if cache exists)
+        cached: set[PepperOffer] = set(self.cache) if self.cache else set()
+        new_offers = [offer for offer in aggregated.values() if offer not in cached]
+
+        for offer in new_offers:
+            logging.info(f"New Pepper offer: {offer.name}")
+
+        if new_offers:
+            self.update_cache(new_offers)
+
+        return new_offers
+
+    @staticmethod
+    def new_offers_to_dict(new_offers: list[PepperOffer]) -> list[dict[str, str]]:
+        """
+        Convert PepperOffer objects into serializable dictionaries.
+
+        Args:
+            new_offers: list of PepperOffer instances.
+
+        Returns:
+            list[dict[str, str]]: Plain dictionaries for downstream usage.
+        """
+        return [
+            {
+                "name": offer.name,
+                "link": offer.link,
+                "image": offer.image or "",
+            }
+            for offer in new_offers
+        ]
