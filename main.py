@@ -27,7 +27,13 @@ def generate_html_str(unique_offers: list[dict]) -> str:
 def send_mail(html_content: str) -> None:
     email_subject = 'Oferty LZX i Pepper'
     yag = yagmail.SMTP(os.getenv('SRC_MAIL'), os.getenv('SRC_PWD'), port=587, smtp_starttls=True, smtp_ssl=False)
-    yag.send(to=os.getenv('DST_MAIL'), subject=email_subject, contents=(html_content, 'text/html'))
+    # Send as plain HTML content without CSS processing
+    yag.send(
+        to=os.getenv('DST_MAIL'),
+        subject=email_subject,
+        contents=html_content,
+        attachments=None
+    )
 
 
 # -------- New helpers (senior-style refactor) --------
@@ -54,8 +60,7 @@ def _scrape_lzx() -> list[dict]:
         return []
     try:
         scr = LzxScrapper(url)
-        entries = scr.get_offers()
-        return entries if isinstance(entries, list) else []
+        return scr.get_offers()
     except Exception:
         logging.exception("LZX scraping failed")
         return []

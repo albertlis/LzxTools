@@ -257,10 +257,11 @@ class LzxScrapper:
         self._fetch_images(entries)
         return entries
 
-    def get_offers(self) -> list[FeedParserDict]:
-        """Convenience: fetch then enrich recent entries."""
+    def get_offers(self) -> list[dict[str, Any]]:
+        """Convenience: fetch, enrich and convert recent entries to dict format."""
         entries = self.fetch()
-        return self.enrich(entries)
+        enriched = self.enrich(entries)
+        return self.offers_to_dict(enriched)
 
     def group(
             self,
