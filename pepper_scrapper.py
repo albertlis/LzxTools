@@ -120,6 +120,32 @@ class PepperScrapper(ScrapperBase):
         except Exception:
             logging.debug("Cookie dialog not found or already dismissed.")
 
+    def _switch_to_weekly(self, page: Page) -> None:
+        """
+        Open the timeframe dropdown (currently showing 'Dzisiaj' or other)
+        and select 'Tydzień' (button[value='week']).
+        Silent on failure.
+        """
+        try:
+            # Try to detect if already set to 'Tydzień'
+            dropdown = page.locator("#threadListingDescriptionPortal button.aGrid").first
+            with contextlib.suppress(Exception):
+                if "Tydzień" in (dropdown.inner_text() or ""):
+                    return
+
+            # Open dropdown
+            dropdown.click()
+            # Wait for the popover and click 'Tydzień'
+            week_btn = page.locator("section.popover--dropdown button[value='week']").first
+            week_btn.wait_for(state="visible", timeout=5_000)
+            week_btn.click()
+
+            # Best-effort: wait until label shows 'Tydzień'
+            with contextlib.suppress(Exception):
+                page.locator("#threadListingDescriptionPortal button.aGrid:has-text('Tydzień')").wait_for(timeout=3_000)
+        except Exception as exc:
+            logging.debug(f"Failed to switch to weekly timeframe: {exc}")
+
     def _extract_offers_from_current_page(self, page) -> list[PepperOffer]:
         """Parse currently loaded page and return PepperOffer objects (without cache filtering)."""
         offers: list[PepperOffer] = []
@@ -168,6 +194,9 @@ class PepperScrapper(ScrapperBase):
 
                 if idx == 0:
                     self._dismiss_cookie_banner(page)
+
+                # Switch to 'Tydzień' timeframe
+                self._switch_to_weekly(page)
 
                 # Small pause to let dynamic content settle
                 page.wait_for_timeout(self._POST_NAV_SLEEP_MS)
