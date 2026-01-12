@@ -3,6 +3,7 @@ import os
 import platform
 import time
 import argparse
+import zipfile
 from typing import Callable, Iterable
 
 import schedule
@@ -27,13 +28,52 @@ def generate_html_str(unique_offers: list[dict]) -> str:
 def send_mail(html_content: str) -> None:
     email_subject = 'Oferty LZX i Pepper'
     yag = yagmail.SMTP(os.getenv('SRC_MAIL'), os.getenv('SRC_PWD'), port=587, smtp_starttls=True, smtp_ssl=False)
-    # Send as plain HTML content without CSS processing
-    yag.send(
-        to=os.getenv('DST_MAIL'),
-        subject=email_subject,
-        contents=html_content,
-        attachments=None
-    )
+
+    content_bytes = html_content.encode('utf-8')
+    content_size = len(content_bytes)
+    logging.info("Preparing email. Content size: %d bytes (%d chars)", content_size, len(html_content))
+
+    # If content is large (> 100KB), send as attachment to avoid Gmail clipping/delivery issues
+    # Gmail clips messages at ~102KB and may silently reject without SMTP error
+    if content_size > 100_000:
+        logging.warning(f"Content large ({content_size}). Sending as ZIP attachment.")
+        html_path = 'offers_large.html'
+        zip_path = 'offers_large.zip'
+
+        # Write HTML file
+        with open(html_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        # Pack to ZIP with high compression
+        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
+            zipf.write(html_path, arcname='offers.html')
+
+        zip_size = os.path.getsize(zip_path)
+        logging.info("Compressed %d bytes to %d bytes (%.1f%% reduction)",
+                     content_size, zip_size, 100 * (1 - zip_size / content_size))
+
+        result = yag.send(
+            to=os.getenv('DST_MAIL'),
+            subject=email_subject,
+            contents="Wiadomość jest zbyt duża. Oferty znajdują się w załączniku ZIP.",
+            attachments=[zip_path]
+        )
+        logging.info("Email send result (with ZIP attachment): %s", result)
+
+        try:
+            os.remove(html_path)
+            os.remove(zip_path)
+        except OSError:
+            pass
+    else:
+        # Send as plain HTML content without CSS processing
+        result = yag.send(
+            to=os.getenv('DST_MAIL'),
+            subject=email_subject,
+            contents=html_content,
+            attachments=None
+        )
+        logging.info("Email send result (inline HTML): %s", result)
 
 
 # -------- New helpers (senior-style refactor) --------

@@ -120,7 +120,8 @@ class PepperScrapper(ScrapperBase):
         except Exception:
             logging.debug("Cookie dialog not found or already dismissed.")
 
-    def _switch_to_weekly(self, page: Page) -> None:
+    @staticmethod
+    def _switch_to_weekly(page: Page) -> None:
         """
         Open the timeframe dropdown (currently showing 'Dzisiaj' or other)
         and select 'Tydzień' (button[value='week']).
