@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Oferty – {{ generated_at }}</title>
+  <style>
+    /* ── Reset & base ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      line-height: 1.6;
+      /* obsługa notcha / safe area (iPhone X+) */
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .page-wrapper {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 0.75rem 5rem;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 17, 23, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 0.75rem 1rem;
+      padding-top: calc(0.75rem + env(safe-area-inset-top));
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 0;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.05rem; flex-shrink: 0;
+    }
+    .logo-text { font-size: 1.15rem; font-weight: 700; color: #f8fafc; letter-spacing: -0.02em; white-space: nowrap; }
+    .logo-sub  { font-size: 0.7rem; color: #64748b; margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .header-meta {
+      font-size: 0.75rem;
+      color: #475569;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .header-meta strong { color: #94a3b8; }
+
+    /* ── Stats bar ──────────────────────────────────────────── */
+    .stats-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 1rem 0 0.5rem;
+      /* nieco "odsuń" od krawędzi na mobile przez negatywny margin + padding */
+    }
+    .stats-bar::-webkit-scrollbar { display: none; }
+    .stat-pill {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 999px;
+      padding: 0.35rem 0.9rem;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      display: flex; align-items: center; gap: 0.35rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .stat-pill strong { color: #c7d2fe; font-variant-numeric: tabular-nums; }
+
+    /* ── Source filter tabs ─────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 0.75rem 0 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      margin-bottom: 1rem;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    .filter-btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #94a3b8;
+      border-radius: 10px;
+      padding: 0.5rem 1.1rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: all 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+      /* duże obszary dotyku */
+      min-height: 40px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .filter-btn:active  { background: rgba(99,102,241,0.2); }
+    .filter-btn.active  { background: rgba(99,102,241,0.25); border-color: #6366f1; color: #a5b4fc; font-weight: 600; }
+    @media (hover: hover) {
+      .filter-btn:hover { background: rgba(99,102,241,0.15); border-color: #6366f1; color: #c7d2fe; }
+    }
+
+    /* ── Grid ───────────────────────────────────────────────── */
+    /* Mobile-first: 1 kolumna */
+    .offers-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+    }
+
+    /* ── Card ───────────────────────────────────────────────── */
+    .card {
+      background: #1a1d27;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: row;   /* poziomy układ na mobile – obraz po lewej */
+      transition: box-shadow 0.2s, border-color 0.2s;
+      position: relative;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 110px;
+    }
+    .card:active { border-color: rgba(99,102,241,0.35); }
+    @media (hover: hover) {
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 35px rgba(0,0,0,0.45);
+        border-color: rgba(99,102,241,0.35);
+      }
+    }
+
+    /* source badge */
+    .card-source {
+      position: absolute;
+      top: 0.55rem; right: 0.55rem;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      z-index: 2;
+    }
+    .src-pepper  { background: rgba(249,115,22,0.18); color: #fb923c; border-color: rgba(249,115,22,0.35); }
+    .src-lzx     { background: rgba(16,185,129,0.18); color: #34d399; border-color: rgba(16,185,129,0.35); }
+    .src-otomoto { background: rgba(59,130,246,0.18);  color: #60a5fa; border-color: rgba(59,130,246,0.35); }
+    .src-other   { background: rgba(148,163,184,0.12);  color: #94a3b8; border-color: rgba(148,163,184,0.25); }
+
+    /* image – thumbnail po lewej na mobile */
+    .card-img-wrap {
+      width: 110px;
+      min-width: 110px;
+      align-self: stretch;
+      background: #0d1018;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .card-img-wrap img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .card-img-placeholder {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 0.3rem;
+      color: #334155;
+      font-size: 0.65rem;
+    }
+    .card-img-placeholder svg { opacity: 0.25; }
+
+    /* body */
+    .card-body {
+      padding: 0.7rem 2.6rem 0.7rem 0.85rem; /* prawy padding na badge */
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 0.3rem;
+      min-width: 0;
+    }
+    .card-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-desc {
+      font-size: 0.75rem;
+      color: #64748b;
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-footer {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding-top: 0.5rem;
+    }
+    .card-price {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #a5f3fc;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+    .card-price.no-price { color: #334155; font-size: 0.75rem; font-weight: 400; }
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+      /* duży obszar dotyku */
+      min-height: 36px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card-link:active { opacity: 0.75; }
+    @media (hover: hover) {
+      .card-link:hover { opacity: 0.88; transform: translateY(-1px); }
+    }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 1.5rem;
+      color: #334155;
+    }
+    .empty-state svg { display: block; margin: 0 auto 1.25rem; opacity: 0.25; }
+    .empty-state h2 { font-size: 1.25rem; color: #475569; margin-bottom: 0.5rem; }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      font-size: 0.72rem;
+      color: #1e293b;
+    }
+
+    /* ── Scrollbar (desktop) ────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0f1117; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* ── Tablet: 2 kolumny z pionowymi kartami ──────────────── */
+    @media (min-width: 540px) {
+      .page-wrapper { padding: 0 1rem 5rem; }
+      .offers-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+      .card {
+        flex-direction: column;
+        min-height: unset;
+      }
+      .card-img-wrap {
+        width: 100%;
+        min-width: unset;
+        aspect-ratio: 16/9;
+        align-self: auto;
+      }
+      .card-body {
+        padding: 0.9rem 1rem 1rem;
+        gap: 0.45rem;
+      }
+      .card-title { font-size: 0.92rem; -webkit-line-clamp: 3; }
+      .card-desc  { font-size: 0.78rem; }
+      .card-price { font-size: 1.1rem; }
+    }
+
+    /* ── Desktop: 3+ kolumny ────────────────────────────────── */
+    @media (min-width: 900px) {
+      .page-wrapper { padding: 0 1.5rem 5rem; }
+      .offers-grid {
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 1.25rem;
+      }
+      .card-img-wrap { aspect-ratio: 16/9; }
+      .card-body { padding: 1rem 1.1rem 1.1rem; gap: 0.5rem; }
+      .card-title { font-size: 0.95rem; }
+      .card-desc  { font-size: 0.8rem; }
+      .card-price { font-size: 1.2rem; }
+      .header-meta { display: block; }
+    }
+
+    /* ── Ukryj header-meta na wąskich ekranach ──────────────── */
+    @media (max-width: 539px) {
+      .header-meta { display: none; }
+      header { padding: 0.65rem 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      <div>
+        <div class="logo-text">Oferty</div>
+        <div class="logo-sub">semaforowamieszkanie.top</div>
+      </div>
+    </div>
+    <div class="header-meta">
+      Wygenerowano: <strong>{{ generated_at }}</strong><br>
+      Łącznie ofert: <strong>{{ individual_offers | length }}</strong>
+    </div>
+  </div>
+</header>
+
+<div class="page-wrapper">
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    {% set sources = individual_offers | map(attribute='source') | list %}
+    <div class="stat-pill">📦 Wszystkie <strong>{{ individual_offers | length }}</strong></div>
+    {% for src, label, emoji in [('pepper','Pepper','🌶️'), ('lzx','LZX','🏷️'), ('otomoto','Otomoto','🚗')] %}
+      {% set cnt = individual_offers | selectattr('source', 'equalto', src) | list | length %}
+      {% if cnt > 0 %}
+    <div class="stat-pill">{{ emoji }} {{ label }} <strong>{{ cnt }}</strong></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Filter buttons (JS-powered) -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterCards('all', this)">Wszystkie</button>
+    {% for src, label, emoji in [('pepper','Pepper','🌶️'), ('lzx','LZX','🏷️'), ('otomoto','Otomoto','🚗')] %}
+      {% set cnt = individual_offers | selectattr('source', 'equalto', src) | list | length %}
+      {% if cnt > 0 %}
+    <button class="filter-btn" onclick="filterCards('{{ src }}', this)">{{ emoji }} {{ label }}</button>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Offers grid -->
+  <div class="offers-grid" id="offers-grid">
+
+    {% if individual_offers and individual_offers | length > 0 %}
+      {% for item in individual_offers %}
+      {%- set src = item.source | default('') | lower -%}
+      {%- set src_class = 'src-' + src if src in ['pepper','lzx','otomoto'] else 'src-other' -%}
+      {%- set src_label = {'pepper':'Pepper','lzx':'LZX','otomoto':'Otomoto'}.get(src, src | capitalize) -%}
+      <div class="card" data-source="{{ src }}">
+
+        {% if src %}
+        <span class="card-source {{ src_class }}">{{ src_label }}</span>
+        {% endif %}
+
+        <!-- Image -->
+        <div class="card-img-wrap">
+          {% if item.image %}
+          <img src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">
+          {% else %}
+          <div class="card-img-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="m21 15-5-5L5 21"/>
+            </svg>
+            Brak zdjęcia
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Body -->
+        <div class="card-body">
+          <div class="card-title">{{ item.name }}</div>
+          {% if item.description %}
+          <div class="card-desc">{{ item.description }}</div>
+          {% endif %}
+
+          <div class="card-footer">
+            {% if item.price %}
+            <span class="card-price">{{ item.price }}</span>
+            {% else %}
+            <span class="card-price no-price">Cena nieznana</span>
+            {% endif %}
+            {% if item.link %}
+            <a class="card-link" href="{{ item.link }}" target="_blank" rel="noopener">
+              Zobacz
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <h2>Brak ofert</h2>
+        <p>W tej chwili nie znaleziono żadnych ofert. Sprawdź ponownie później.</p>
+      </div>
+    {% endif %}
+
+  </div><!-- /offers-grid -->
+</div><!-- /page-wrapper -->
+
+<footer>
+  Dane pobrane automatycznie · {{ generated_at }} · oferty.semaforowamieszkanie.top
+</footer>
+
+<script>
+  function filterCards(source, btn) {
+    // update active button
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // filter cards
+    const cards = document.querySelectorAll('#offers-grid .card');
+    cards.forEach(card => {
+      const show = source === 'all' || card.dataset.source === source;
+      card.style.display = show ? '' : 'none';
+    });
+  }
+</script>
+</body>
+</html>
+

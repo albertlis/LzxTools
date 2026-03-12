@@ -14,6 +14,7 @@ dependencies = [
   "jinja2",
   "pillow",
   "playwright",
+  "playwright-stealth",
   "python-dateutil",
   "python-dotenv",
   "pytz",
