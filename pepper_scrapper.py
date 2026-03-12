@@ -83,14 +83,16 @@ class PepperOffer:
     Immutable representation of a Pepper offer.
 
     Fields:
-        name:  Human readable title (optionally enriched with price).
+        name:  Human readable title.
         link:  Direct URL to the offer.
         image: Image URL (may be None if missing).
+        price: Price/discount string (may be empty).
     """
 
     name: str
     link: str
     image: str | None
+    price: str = ""
 
 
 class PepperScrapper(ScrapperBase):
@@ -270,11 +272,10 @@ class PepperScrapper(ScrapperBase):
                 if link and not link.startswith("http"):
                     link = f"https://www.pepper.pl{link}"
                 price_el = container.locator(self._price_selector)
-                price_text = price_el.inner_text().strip() if price_el.count() else ""
+                price_text = price_el.first.inner_text().strip() if price_el.count() else ""
                 image_el = container.locator(self._image_selector)
                 image_src = image_el.get_attribute("src") if image_el.count() else None
-                full_name = f"{title_text}, {price_text}" if price_text else title_text
-                offers.append(PepperOffer(full_name, link, image_src))
+                offers.append(PepperOffer(title_text, link, image_src, price_text))
             except Exception as exc:
                 logging.debug(f"Failed parsing offer index {idx}: {exc}")
         return offers
@@ -356,6 +357,7 @@ class PepperScrapper(ScrapperBase):
                 "name": offer.name,
                 "link": offer.link,
                 "image": offer.image or "",
+                "price": offer.price,
             }
             for offer in new_offers
         ]

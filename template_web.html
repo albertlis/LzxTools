@@ -77,14 +77,9 @@
     .stats-bar {
       display: flex;
       gap: 0.5rem;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
+      flex-wrap: wrap;
       padding: 1rem 0 0.5rem;
-      /* nieco "odsuń" od krawędzi na mobile przez negatywny margin + padding */
     }
-    .stats-bar::-webkit-scrollbar { display: none; }
     .stat-pill {
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.07);
@@ -337,6 +332,16 @@
       .header-meta { display: block; }
     }
 
+    /* ── Auto-chowanie headera przy scrollowaniu ───────────── */
+    header {
+      transition: transform 0.28s ease, opacity 0.28s ease;
+    }
+    header.header-hidden {
+      transform: translateY(-110%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
     /* ── Ukryj header-meta na wąskich ekranach ──────────────── */
     @media (max-width: 539px) {
       .header-meta { display: none; }
@@ -374,6 +379,7 @@
     <div class="stat-pill">{{ emoji }} {{ label }} <strong>{{ cnt }}</strong></div>
       {% endif %}
     {% endfor %}
+    <div class="stat-pill">🕒 <strong>{{ generated_at }}</strong></div>
   </div>
 
   <!-- Filter buttons (JS-powered) -->
@@ -474,6 +480,30 @@
       card.style.display = show ? '' : 'none';
     });
   }
+
+  // ── Auto-chowanie headera przy scrollowaniu ──────────────────
+  (function () {
+    const header = document.querySelector('header');
+    let lastY = 0;
+    let ticking = false;
+
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const currentY = window.scrollY;
+          // Chowaj tylko jeśli przewinięto trochę w dół (>80px od góry)
+          if (currentY > lastY && currentY > 80) {
+            header.classList.add('header-hidden');
+          } else {
+            header.classList.remove('header-hidden');
+          }
+          lastY = currentY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+  })();
 </script>
 </body>
 </html>
